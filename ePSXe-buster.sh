@@ -7,9 +7,14 @@
 #
 # https://www.epsxe.com/
 #
+# https://raw.githubusercontent.com/Brunopvh/epsxe-buster/master/ePSXe-buster.sh
 # git clone https://github.com/Brunopvh/epsxe-buster.git
 # cd epsxe-buster/ && chmod +x ePSXe-buster.sh && ./ePSXe-buster.sh
 #
+# Opicional:
+# wget -qc https://raw.githubusercontent.com/Brunopvh/epsxe-buster/master/ePSXe-buster.sh -O - | bash 
+#
+# 
 
 
 amarelo="\e[1;33m"
@@ -108,6 +113,12 @@ fi
 	if [[ "$?" != "0" ]]; then exit 1; fi
 }
 
+[[ ! -x $(which aptitude) ]] && {
+	echo -e "${vermelho}Nescessário instalar aptitude $fecha"
+	sudo apt install -y aptitude
+	if [[ $? != 0 ]]; then exit 1; fi
+}
+
 #-----------------[ Ajuda ]----------------#
 function usage()
 {
@@ -116,6 +127,8 @@ texto_ajuda="$0 -> Executa todas as funções (instalação e configuração) - 
 $0 -c|--configure -> Configura o ePSxe (Bios, MemCards e outros) - Não recomendado.
 
 $0 -i|--install -> Somente instala o ePSxe - Não recomendado.
+
+$0 -r|--remove -> Desinstala epsxe e suas dependências.
 
 $0 -h|--help -> Exibe este menu."
 
@@ -154,10 +167,9 @@ esac
 
 }
 
-#---------------------[ Função para instalar o programa ]---------------------#
-function _inst_eps() 
+function _sis_admin()
 {
-
+	
 # Autênticação [sudo].
 while true; do
 	clear
@@ -171,6 +183,14 @@ while true; do
 	}
 	break # Senha foi validada, encerrar o loop e prosseguir.
 done
+
+}
+
+#---------------------[ Função para instalar o programa ]---------------------#
+function _inst_eps() 
+{
+
+(_sis_admin)
 
 # Instalar dependências.
 echo $senha | sudo -S sh -c 'apt update; apt -y install libncurses5 libsdl-ttf2.0-0 unzip'
@@ -240,7 +260,7 @@ sudo cp -vu "${dir_libs}"/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0 '/lib/x86_64
 sudo ln -sf '/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0' '/usr/lib/x86_64-linux-gnu/libcurl.so.4'
 sudo ln -sf '/lib/x86_64-linux-gnu/libcurl.so.4.4.0' '/lib/x86_64-linux-gnu/libcurl.so.4'
 
-# sudo ldconfig -> Recunfigura as libs, porem o programa não ira funcionar mais.
+# sudo ldconfig -> Recunfigura as libs.
 
 sudo -K # Resetar senha sudo.
 wget "$epsxe_icon" -O "${HOME}/.icons/ePSXe.svg"
@@ -260,6 +280,39 @@ echo "[Desktop Entry]" > "${HOME}/.local/share/applications/ePSXe.desktop"
 [[ "$?" == "0" ]] && "$arq_bin_epsxe_amd64"
 	
 } # Fim de _inst_eps
+
+
+#---------------------------[ Função para desinstalar o programa ]--------------#
+function _remove_epsxe()
+{
+
+	remover=$(msgs_zenity "--question" "Desinstalar" "Deseja remover ePSxe ?" "400" "150")
+
+	if [[ $? == 0 ]]; then
+		(_sis_admin); [[ $? != 0 ]] && exit 1
+		sudo rm '/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0' 1> /dev/null 2>&1
+		sudo rm '/lib/x86_64-linux-gnu/libcurl.so.4.4.0' 1> /dev/null 2>&1
+		
+		[[ -f /usr/lib/x86_64-linux-gnu/libcurl.so.4.5.0 ]] && {
+			sudo ln -sf /usr/lib/x86_64-linux-gnu/libcurl.so.4.5.0 /usr/lib/x86_64-linux-gnu/libcurl.so.4 
+		}
+		
+		[[ -f /lib/x86_64-linux-gnu/libcurl.so.4.5.0 ]] && {
+			sudo ln -sf /lib/x86_64-linux-gnu/libcurl.so.4.5.0 /lib/x86_64-linux-gnu/libcurl.so.4
+		}
+		
+		sudo aptitude remove libssl1.0.0
+		sudo aptitude remove libssl1.0.2
+		
+		rm -rf "$dir_inst" 1> /dev/null 2>&1	
+		rm "${HOME}/.local/share/applications/ePSXe.desktop" 1> /dev/null 2>&1
+		rm "${HOME}/.icons/ePSXe.svg" 1> /dev/null 2>&1
+		
+	msgs_zenity "--info" "Operação finalizada" "ePSXe desinstalado" "450" "150"
+	fi
+
+}
+
 
 #-------------------------------[ Bios ]-------------------------------#
 function _config_bios() {
@@ -328,6 +381,7 @@ if [[ ! -z "$1" ]]; then
 			-c|--configure) (_configurar_epsxe);;
 			-i|--install) (_inst_eps);;
 			-h|--help) (usage);;
+			-r|--remove) (_remove_epsxe);;
 			-v|--version) grep '^# Versão:' $0 | sed 's|^# ||g';;
 			*) (usage); break; exit 1;;
 		
