@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 #
 # Autor: Bruno Chaves
-# Versão: 1.7
+# Versão: 1.9
 #
 # Este programa istalar o emulador ePSxe amd64 no debian 64 bits.
 #
 # https://www.epsxe.com/
 #
+# git clone https://github.com/Brunopvh/epsxe-buster.git
+# cd epsxe-buster/ && chmod +x ePSXe-buster.sh && ./ePSXe-buster.sh
+#
+
 
 amarelo="\e[1;33m"
 Amarelo="\e[1;33;5m"
@@ -19,7 +23,7 @@ fecha="\e[m"
 clear
 
 if [[ -z "$DESKTOP_SESSION" ]]; then 
-	printf "${vermelho}Nescessário logar em modo gráfico ${fecha}\n"
+	printf "${vermelho}Nescessário logar em modo gráfico [não root] ${fecha}\n"
 	exit 1 
 fi
 
@@ -47,30 +51,41 @@ dir_configuracao="${HOME}/.epsxe"
 mkdir -p "$dir_inst" "$DIR_GAMES" "$dir_libs" "$dir_configuracao" "${DIR_BIN}/epsxe-amd64-old" "${HOME}/.icons"
 
 # Arquivos
-arq_down="${DIR_GAMES}/epsxe-amd64.zip"
-arq_libcurl3="${DIR_GAMES}/libcurl3_7_deb9_amd64.deb"
-arq_libcurl4_amd64="${DIR_GAMES}/libcurl4_amd64.deb"
-arq_libssl1="${DIR_GAMES}/libssl1_deb9_amd64.deb"
-arq_libssl_deb8="${DIR_GAMES}/libssl1.0_deb8_amd64.deb"
-bin_epsxe="${dir_inst}"/epsxe_x64
+arq_epsxe_zip="${DIR_GAMES}/epsxe-amd64.zip"
+arq_link_libcurl3_deb9_amd64="${DIR_GAMES}/libcurl3_7_deb9_amd64.deb"
+arq_link_libcurl4_amd64="${DIR_GAMES}/link_libcurl4_amd64.deb"
+arq_libssl1_deb9_amd64="${DIR_GAMES}/libssl1_deb9_amd64.deb"
+arq_libssl1_deb8_amd64="${DIR_GAMES}/libssl1.0_deb8_amd64.deb"
+arq_bin_epsxe_amd64="${dir_inst}"/epsxe_x64
 arq_configuracao="${dir_configuracao}"/epsxerc
 
 # Links
-link_down="http://www.epsxe.com/files/ePSXe205linux_x64.zip"
-libssl_deb9_amd64="http://ftp.us.debian.org/debian/pool/main/o/openssl1.0/libssl1.0.2_1.0.2s-1~deb9u1_amd64.deb"
-libssl_deb8_amd64="http://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u11_amd64.deb"
-libcurl3_deb9_amd64="http://ftp.us.debian.org/debian/pool/main/c/curl/libcurl3_7.52.1-5+deb9u9_amd64.deb"
-libcurl4_amd64="http://ftp.us.debian.org/debian/pool/main/c/curl/libcurl4_7.65.3-1_amd64.deb"
+link_down_epsxe="http://www.epsxe.com/files/ePSXe205linux_x64.zip"
+link_libssl_deb9_amd64="http://ftp.us.debian.org/debian/pool/main/o/openssl1.0/libssl1.0.2_1.0.2s-1~deb9u1_amd64.deb"
+link_libssl_deb8_amd64="http://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u11_amd64.deb"
+link_libcurl3_deb9_amd64="http://ftp.us.debian.org/debian/pool/main/c/curl/libcurl3_7.52.1-5+deb9u9_amd64.deb"
+link_libcurl4_amd64="http://ftp.us.debian.org/debian/pool/main/c/curl/libcurl4_7.65.3-1_amd64.deb"
 epsxe_icon="https://raw.githubusercontent.com/brandleesee/ePSXe64Ubuntu/master/.ePSXe.svg"
 
 # sha256sum
 hash_libcurl3_7_deb9_amd64='f8c55748a97693588c83a0f272cdb1943d8efb55c4d0485e543a7d43cd4a9637'
-hash_libcurl4_amd64='b82dd3fb8bb1df71fa0a0482df0356cd0eddf516a65f3fe3dad6be82490f1aca'
+hash_link_libcurl4_amd64='b82dd3fb8bb1df71fa0a0482df0356cd0eddf516a65f3fe3dad6be82490f1aca'
 hash_libssl1_deb8_amd64='793926fb2d9bd152cdf72551d9a36c83090e0f574dbe0063de1528465bf46479'
 hash_libssl1_0_2_deb9_amd64='4808b312acefe9e276ac77a23ca4a3d504685f03a7d669827dcde0b8729d7f3c'
 hash_epsxe='60a99db5f400328bebe0a972caea6206d1a24d59a092248c0b5fc12e184eca99'
+hash_bin_epsxe_amd64='c3f1d88d0e9075e04073237e5dfda6c851ce83af29e912f62baaf67af8a52579'
 
 #----------------- Programas nescessários para proseguir -------------#
+
+if [[ $USER == 'root' ]] || [[ $UID == '0' ]]; then
+	echo -e "${vermelho}Usuário não pode ser o [root] saindo... $fecha"
+	exit 1
+fi
+
+[[ ! -x $(which sudo) ]] && {
+	echo -e "${vermelho}[sudo] não instalado saindo... $fecha"
+	exit 1
+}
 
 # wget
 [[ ! -x $(which wget) ]] && { 
@@ -139,7 +154,7 @@ esac
 
 }
 
-#===========================[ Função para instalar o programa ]=============#
+#---------------------[ Função para instalar o programa ]---------------------#
 function _inst_eps() 
 {
 
@@ -162,59 +177,70 @@ echo $senha | sudo -S sh -c 'apt update; apt -y install libncurses5 libsdl-ttf2.
 
 [[ $? != "0" ]] && exit 1
 
-#---------------------------- Baixar arquivos ---------------#
+#----------------------------[ Baixar arquivos ]---------------#
 
 # ePSxe.zip
-if [[ $(sha256sum "$arq_down" | cut -d ' ' -f 1) != "$hash_epsxe" ]]; then
-	echo -e "${Verde}Baixando:${fecha} $arq_down"
-	wget "$link_down" -O "$arq_down"
+if [[ $(sha256sum "$arq_epsxe_zip" | cut -d ' ' -f 1) != "$hash_epsxe" ]]; then
+	echo -e "${Verde}Baixando:${fecha} $arq_epsxe_zip"
+	wget "$link_down_epsxe" -O "$arq_epsxe_zip"
 fi
 
 # libssl 1.0.2 amd64 deb 9
-if [[ $(sha256sum "$arq_libssl1" | cut -d ' ' -f 1) != "$hash_libssl1_0_2_deb9_amd64" ]]; then
-	echo -e "${Verde}Baixando:${fecha} $arq_libssl1"
-	wget "$libssl_deb9_amd64" -O "$arq_libssl1"	
+if [[ $(sha256sum "$arq_libssl1_deb9_amd64" | cut -d ' ' -f 1) != "$hash_libssl1_0_2_deb9_amd64" ]]; then
+	echo -e "${Verde}Baixando:${fecha} $arq_libssl1_deb9_amd64"
+	wget "$link_libssl_deb9_amd64" -O "$arq_libssl1_deb9_amd64"	
 fi
 
 # libssl 1.0 amd64 deb 8
-if [[ $(sha256sum "$arq_libssl_deb8" | cut -d ' ' -f 1) != "$hash_libssl1_deb8_amd64" ]]; then
-	echo -e "${Verde}Baixando:${fecha} $arq_libssl_deb8"
-	wget "$libssl_deb8_amd64" -O "$arq_libssl_deb8"
+if [[ $(sha256sum "$arq_libssl1_deb8_amd64" | cut -d ' ' -f 1) != "$hash_libssl1_deb8_amd64" ]]; then
+	echo -e "${Verde}Baixando:${fecha} $arq_libssl1_deb8_amd64"
+	wget "$link_libssl_deb8_amd64" -O "$arq_libssl1_deb8_amd64"
 fi
 
 # libcurl3 amd64
-if [[ $(sha256sum "$arq_libcurl3" | cut -d ' ' -f 1) != "$hash_libcurl3_7_deb9_amd64" ]]; then
-	echo -e "${Verde}Baixando:${fecha} $arq_libcurl3"
-	wget "$libcurl3_deb9_amd64" -O "$arq_libcurl3"
+if [[ $(sha256sum "$arq_link_libcurl3_deb9_amd64" | cut -d ' ' -f 1) != "$hash_libcurl3_7_deb9_amd64" ]]; then
+	echo -e "${Verde}Baixando:${fecha} $arq_link_libcurl3_deb9_amd64"
+	wget "$link_libcurl3_deb9_amd64" -O "$arq_link_libcurl3_deb9_amd64"
 fi
 
 #----------------------- Backup de versões anteriores se existir -------#
 
-cp -rvu "${dir_inst}"/* "${HOME}/.local/bin/epsxe-amd64-old"/ 1> /dev/null 2>&1
-rm -rf "${dir_inst}"/* 1> /dev/null 2>&1
-
 # Descompactar e instalar
-unzip "$arq_down" -d "$dir_inst"
-chmod +x "$bin_epsxe"
-ln -sf "$bin_epsxe" ~/.local/bin/epsxe64
+if [[ $(sha256sum $arq_bin_epsxe_amd64 | cut -d ' ' -f 1) != "$hash_bin_epsxe_amd64" ]]; then
+
+	cp -rvu "${dir_inst}"/* "${HOME}/.local/bin/epsxe-amd64-old"/ 1> /dev/null 2>&1
+	rm -rf "${dir_inst}"/* 1> /dev/null 2>&1
+
+	unzip "$arq_epsxe_zip" -d "$dir_inst"
+	chmod +x "$arq_bin_epsxe_amd64"
+	ln -sf "$arq_bin_epsxe_amd64" ~/.local/bin/epsxe64
+fi
+
+# Incluir $HOME/.local/bin  em PATH se não estiver disponível.
+echo "$PATH" | egrep -q "${HOME}/.local/bin"
+	[[ $? != "0" ]] && export PATH="$HOME/.local/bin:$PATH"
 
 # libssl1.0.2 deb9 amd64
 if [[ $(aptitude show libssl1.0.2 | grep '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
-	sudo gdebi-gtk "$arq_libssl1"
+	sudo gdebi-gtk "$arq_libssl1_deb9_amd64"
 fi
 
 # libssl1.0.0 deb8 amd64
 if [[ $(aptitude show libssl1.0.0 | grep '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
-	sudo gdebi-gtk "$arq_libssl_deb8"
+	sudo gdebi-gtk "$arq_libssl1_deb8_amd64"
 fi
 
 # Extrair libcurl3
 sudo rm -rf "${dir_libs}"/* 1> /dev/null 2>&1 # Limpar o diretório de extração das libs.
-sudo dpkg-deb -x "$arq_libcurl3" "${dir_libs}"
-sudo cp -vu "${dir_libs}"/usr/lib/x86_64-linux-gnu/libcurl.so.3 '/usr/lib/x86_64-linux-gnu/libcurl.so.3'
-sudo cp -vu "${dir_libs}"/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0 '/usr/lib/x86_64-linux-gnu/libcurl.so.4'
+sudo dpkg-deb -x "$arq_link_libcurl3_deb9_amd64" "${dir_libs}"
+
+sudo cp -vu "${dir_libs}"/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0 '/usr/lib/x86_64-linux-gnu/'
+sudo cp -vu "${dir_libs}"/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0 '/lib/x86_64-linux-gnu/libcurl.so.4.4.0'
+
 sudo ln -sf '/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0' '/usr/lib/x86_64-linux-gnu/libcurl.so.4'
-# sudo ldconfig
+sudo ln -sf '/lib/x86_64-linux-gnu/libcurl.so.4.4.0' '/lib/x86_64-linux-gnu/libcurl.so.4'
+
+# sudo ldconfig -> Recunfigura as libs, porem o programa não ira funcionar mais.
 
 sudo -K # Resetar senha sudo.
 wget "$epsxe_icon" -O "${HOME}/.icons/ePSXe.svg"
@@ -223,7 +249,7 @@ echo "[Desktop Entry]" > "${HOME}/.local/share/applications/ePSXe.desktop"
 	{
 	  echo "Type=Application"
 	  echo "Terminal=false"
-	  echo "Exec=$bin_epsxe"
+	  echo "Exec=$arq_bin_epsxe_amd64"
 	  echo "Name=ePSXe"
 	  echo "Comment=Emulador PS1"
 	  echo "Icon=${HOME}/.icons/ePSXe.svg"
@@ -231,7 +257,7 @@ echo "[Desktop Entry]" > "${HOME}/.local/share/applications/ePSXe.desktop"
 	} >> "${HOME}/.local/share/applications/ePSXe.desktop"
 
 
-[[ "$?" == "0" ]] && "$bin_epsxe"
+[[ "$?" == "0" ]] && "$arq_bin_epsxe_amd64"
 	
 } # Fim de _inst_eps
 
