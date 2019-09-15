@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Autor: Bruno Chaves
-# Versão: 1.9
+# Versão: 2.2
 #
 # Este programa istalar o emulador ePSxe amd64 no debian 64 bits.
 #
@@ -303,6 +303,7 @@ function _remove_epsxe()
 		
 		sudo aptitude remove libssl1.0.0
 		sudo aptitude remove libssl1.0.2
+		sudo ldconfig
 		
 		rm -rf "$dir_inst" 1> /dev/null 2>&1	
 		rm "${HOME}/.local/share/applications/ePSXe.desktop" 1> /dev/null 2>&1
