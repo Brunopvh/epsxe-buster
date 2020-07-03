@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
 # Autor: Bruno Chaves
-# Versão: 2.8
+__version__='2020-07-03'
 # Ultima modificação: 2019-010-03
 #
-# Este programa istalar o emulador ePSxe amd64 no debian 64 bits.
+# Este programa istala o emulador ePSxe versão 64 bits no debian 10.
 #
 # https://www.epsxe.com/
 #
@@ -12,138 +12,166 @@
 # git clone https://github.com/Brunopvh/epsxe-buster.git
 # cd epsxe-buster/ && chmod +x ePSXe-buster.sh && ./ePSXe-buster.sh
 #
-# Opicional:
+# Exucuçã via wget:
 # wget -qc https://raw.githubusercontent.com/Brunopvh/epsxe-buster/master/ePSXe-buster.sh -O - | bash 
 #
 # 
 
+CRed="\e[0;31m"
+CSRed='\e[1;31m'
+CGreen="\e[0;32m"
+CYellow="\e[0;33m"
+CSYellow="\e[1;33m"
+CReset="\e[m"
 
-amarelo="\e[1;33m"
-Amarelo="\e[1;33;5m"
-vermelho="\e[1;31m"
-Vermelho="\e[1;31;5m"
-verde="\e[1;32m"
-Verde="\e[1;32;5m"
-fecha="\e[m"
+_msg()
+{
+	echo '-----------------------------------------------'
+	echo -e " $@"
+	echo '-----------------------------------------------'
+}
 
-clear
+_yellow()
+{
+	echo -e "[${CYellow}+${CReset}] $@"
+}
 
+_red()
+{
+	echo -e "[${CRed}!${CReset}] $@"
+}
 
-if [[ $USER == 'root' ]] || [[ $UID == '0' ]]; then
-	echo -e "${vermelho}Usuário não pode ser o [root] saindo... $fecha"
+_syellow()
+{
+	echo -e "${CSYellow}$@${CReset}"
+}
+
+_sred()
+{
+	echo -e "${CSRed}$@${CReset}"
+}
+
+if [[ $(id -u) == '0' ]]; then
+	_red 'Não execute como root, saindo...'
 	exit 1
 fi
 
-if [[ -z "$DESKTOP_SESSION" ]]; then 
-	printf "${vermelho}Nescessário logar em modo gráfico [não root] ${fecha}\n"
+if [[ -z "$DISPLAY" ]]; then 
+	_red 'Nescessário logar em sessão gráfica para prosseguir, saindo...'
 	exit 1 
 fi
 
 
-#----------------------[ Diretórios de trabalho ]-------------------------#
-# export local_trab=$(dirname $0) 
-export readonly local_trab=$(dirname $(readlink -f "$0")) # Path do programa no sistema.
+# Path do programa no disco.
+export readonly dir_root=$(dirname $(readlink -f "$0"))
 
-export codinome_sistema=$(grep '^VERSION_CODENAME' /etc/os-release | sed 's|.*=||g') # Codinome
-export nome_sistema=$(grep '^ID=' /etc/os-release | sed 's|.*=||g') # Sistema
+# Codinome
+export os_codename=$(grep '^VERSION_CODENAME' /etc/os-release | sed 's|.*=||g') 
 
-[[ "$codinome_sistema" == "buster" ]] || {
-	printf "${vermelho}Este programa e incompativel com seu sistema ${fecha}\n"
+# Sistema
+export os_name=$(grep '^ID=' /etc/os-release | sed 's|.*=||g') 
+
+if [[ "$os_codename" != "buster" ]]; then
+	_red 'Seu sistema não é suportado por este programa.'
 	exit 1
-}
+fi
 
+#DIR_TEMP=$(mktemp -d)
+DIR_TEMP="/tmp/epsxe_$USER";                                     mkdir -p "$DIR_TEMP"
+DIR_DOWNLOADS="$HOME/epsxe-buster/downloads";                    mkdir -p "$DIR_DOWNLOADS"
+DIR_BIN="${HOME}/.local/bin";                                    mkdir -p "$DIR_BIN" 
+DirUnpack="$DIR_TEMP/unpack";                                    mkdir -p "$DirUnpack"
+destinationConfigDir="${HOME}/.epsxe";                           mkdir -p "$destinationConfigDir" 
+destinationBackupDir="$HOME"/ePSXe_backups/$(date "+%F-%T-%Z");  mkdir -p "$destinationBackupDir"
 
-# Diretórios
-DIR_TEMP="/tmp/epsxe-tmp"
-DIR_LIBS="/tmp/libs"
-DIR_BIN="${HOME}/.local/bin"
-dir_configuracao="${HOME}/.epsxe"
+mkdir -p "${HOME}/.icons" 
 
-mkdir -p "$DIR_TEMP" "$DIR_LIBS" "$dir_configuracao" "$DIR_BIN" "${DIR_BIN}/epsxe-amd64-old" "${HOME}/.icons" ~/Downloads
+UrlEpsxeZip="http://www.epsxe.com/files/ePSXe205linux_x64.zip"
+URLepsxeIcon="https://raw.githubusercontent.com/brandleesee/ePSXe64Ubuntu/master/.ePSXe.svg"
 
-# Arquivos
-arq_epsxe_zip="${DIR_TEMP}"/epsxe-amd64.zip
+URLlibsslDeb9='http://ftp.us.debian.org/debian/pool/main/o/openssl1.0/libssl1.0.2_1.0.2u-1~deb9u1_amd64.deb'
+URLlibsslDeb8="http://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u12_amd64.deb"
+URLlibcurl3Deb9="http://ftp.us.debian.org/debian/pool/main/c/curl/libcurl3_7.52.1-5+deb9u9_amd64.deb"
+URLlibcurl4Debian="http://ftp.us.debian.org/debian/pool/main/c/curl/libcurl4_7.65.3-1_amd64.deb"
 
-arq_libcurl3_deb9_amd64="${DIR_TEMP}/libcurl3_7_deb9_amd64.deb"
-arq__libcurl4_amd64="${DIR_TEMP}/link_libcurl4_amd64.deb"
-arq_libssl1_deb9_amd64="${DIR_TEMP}/libssl1_deb9_amd64.deb"
-arq_libssl1_deb8_amd64="${DIR_TEMP}/libssl1.0_deb8_amd64.deb"
+FileLIBcurl3Debian9="${DIR_DOWNLOADS}/$(basename $URLlibcurl3Deb9)"
+FileLIBcurl4Debian="${DIR_DOWNLOADS}/$(basename $URLlibcurl4Debian)"
+FileLIBssl1Debian9="${DIR_DOWNLOADS}/$(basename $URLlibsslDeb9)"
+FileLIBssl1Debian8="${DIR_DOWNLOADS}/$(basename $URLlibsslDeb8)"
 
-arq_configuracao="${dir_configuracao}"/epsxerc
-
-# Links
-ftp_us='http://ftp.us.debian.org/debian'
-security_deb='http://security.debian.org/debian-security'
-
-link_down_epsxe="http://www.epsxe.com/files/ePSXe205linux_x64.zip"
-epsxe_icon="https://raw.githubusercontent.com/brandleesee/ePSXe64Ubuntu/master/.ePSXe.svg"
-
-link_libssl_deb9_amd64="${ftp_us}/pool/main/o/openssl1.0/libssl1.0.2_1.0.2s-1~deb9u1_amd64.deb"
-link_libssl_deb8_amd64="${security_deb}/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u11_amd64.deb"
-link_libcurl3_deb9_amd64="${ftp_us}/pool/main/c/curl/libcurl3_7.52.1-5+deb9u9_amd64.deb"
-link_libcurl4_amd64="${ftp_us}/pool/main/c/curl/libcurl4_7.65.3-1_amd64.deb"
-
+epsxeZipFile="$DIR_DOWNLOADS"/epsxe-amd64.zip
+epsxeConfigFile="${destinationConfigDir}"/epsxerc
+destinationLinkEpsxe="$DIR_BIN/epsxe"
 
 # sha256sum
-hash_libcurl3_7_deb9_amd64='f8c55748a97693588c83a0f272cdb1943d8efb55c4d0485e543a7d43cd4a9637'
-hash_link_libcurl4_amd64='b82dd3fb8bb1df71fa0a0482df0356cd0eddf516a65f3fe3dad6be82490f1aca'
-hash_libssl1_deb8_amd64='793926fb2d9bd152cdf72551d9a36c83090e0f574dbe0063de1528465bf46479'
-hash_libssl1_0_2_deb9_amd64='4808b312acefe9e276ac77a23ca4a3d504685f03a7d669827dcde0b8729d7f3c'
-hash_epsxe='60a99db5f400328bebe0a972caea6206d1a24d59a092248c0b5fc12e184eca99'
+hashFileLIBcurl3Debian9='f8c55748a97693588c83a0f272cdb1943d8efb55c4d0485e543a7d43cd4a9637'
+hashFileLIBcurl4Debian='b82dd3fb8bb1df71fa0a0482df0356cd0eddf516a65f3fe3dad6be82490f1aca'
+hashFileLIBssl1Debian8='c91f6f016d0b02392cbd2ca4b04ff7404fbe54a7f4ca514dc1c499e3f5da23a2'
+hashFileLIBssl1Debian9='a208d375182830bdcad42c0b92154d55233d7cfe4a7543015d6a99c5086416c0'
+hashepsxeZipFile='60a99db5f400328bebe0a972caea6206d1a24d59a092248c0b5fc12e184eca99'
 hash_bin_epsxe_amd64='c3f1d88d0e9075e04073237e5dfda6c851ce83af29e912f62baaf67af8a52579'
 
-#--------------------[ Função para exibir mensagens ]----------------------#
-function _msgs()
+is_executable() 
 {
-	# $1=Cor
-	# $2=Texto/Mensagem
-	# $3=Texto/Mensagem
-	if [[ -z "$2" ]]; then
-		echo -e "${1}$2 ${fecha}"
+	if [[ -x $(command -v "$1" 2> /dev/null) ]]; then
+		return 0
 	else
-		echo -e "${1}$2 \n$3 ${fecha}"
+		return 1
 	fi
 }
 
-# Função para verificar ou instalar os programas necessários.
-function _apps_exist() 
+_check_cli_requeriments()
 {
-	# $1 = programa a verificar ou instalar.
-	local msg="Necessário instalar : "
-	local msg_falha="Falha ao tentar instalar : "
-	echo -e "Checando: $1"
-	
-	[[ -x $(which $1) ]] || { 
-		echo -e "${amarelo}$msg $1 ${fecha}"
-		sudo apt install -y $1
-			[[ $? == 0 ]] || { echo -e "${vermelho}$msg_falha $1 ${fecha}"; exit 1; } 
-	}
+	if ! is_executable sudo; then
+		_red "Instale o pacote (sudo) para prosseguir"
+		return 1
+	fi
+
+
+	if ! is_executable zenity; then
+		_yellow "Instalando: zenity"
+		sudo apt install -y zenity || return 1
+	fi
+
+	if ! is_executable gdebi; then
+		_yellow "Instalando: gdebi"
+		sudo apt install -y gdebi || return 1
+	fi
+
+	if ! is_executable aptitude; then
+		_yellow "Instalando: aptitude"
+		sudo apt install -y aptitude || return 1
+	fi
+
+	if ! is_executable wget; then
+		_yellow "Instalando: wget"
+		sudo apt install -y wget || return 1
+	fi
+
+	if ! is_executable unzip; then
+		_yellow "Instalando: unzip"
+		sudo apt install -y unzip
+	fi
 }
 
-_apps_exist 'sudo' # sudo.
-_apps_exist 'zenity' # zenity.
-_apps_exist  'gdebi' # gdebi.
-_apps_exist 'aptitude' # aptitude.
-
 #-----------------[ Ajuda ]----------------#
-function usage()
+usage()
 {
-texto_ajuda="$0 -> Executa todas as funções (instalação e configuração) - Recomendado.
+cat << EOF
 
-$0 -c|--configure -> Configura o ePSxe (Bios, MemCards e outros) - Não recomendado.
+   Use: $(readlink -f "$0") --install|--configure|--remove|--help
 
-$0 -i|--install -> Somente instala o ePSxe - Não recomendado.
+     -c|--configure    Configura o ePSxe (Bios, MemCards e outros)  
+     -i|--install      Somente instala o ePSxe - Não recomendado.
+     -r|--remove       Desinstala epsxe e suas dependências.
+     -h|--help         Exibe este menu."
 
-$0 -r|--remove -> Desinstala epsxe e suas dependências.
-
-$0 -h|--help -> Exibe este menu."
-
-_msgs_zenity "--info" "Ajuda" "$texto_ajuda" "900" "350"
+EOF
 }
 
 
 #-------------------------[ Função para exibir mensagens com zenity ]----------#
-function _msgs_zenity()
+_msg_zenity()
 {
 
 # (Sim Não) --question --title="Abrir" --text="Abrir ePSxe agora ?" 
@@ -174,128 +202,283 @@ esac
 }
 
 #==================================== PATH ===================================#
-if [[ ! $(echo $PATH | grep "$HOME/.local/bin") ]]; then
-	[[ $(grep "^export PATH=$HOME/.local/bin:$PATH" "${HOME}"/.bashrc) ]] || { 
-	echo "export PATH=$HOME/.local/bin:$PATH" >> "${HOME}"/.bashrc 
-	} 
+# Inserir ~/.local/bin em PATH se ainda não estiver disponível.
+if ! echo "$PATH" | grep "$HOME/.local/bin" 1> /dev/null; then
+	PATH="$HOME/.local/bin:$PATH"
 fi
+
+[[ -f "$HOME/.bashrc" ]] || touch "$HOME/.bashrc"
+
+if ! grep "^export PATH=.*$HOME/.local/bin" "$HOME"/.bashrc 1> /dev/null; then
+	_yellow "Configurando PATH no arquivo ~/.bashrc"
+	echo "export PATH=$HOME/.local/bin:$PATH" >> "${HOME}"/.bashrc  
+fi
+
+__download__()
+{
+	# Baixar os arquivos com wget
+	# $1 = URL
+	# $1 = Arquivo
+	local URL="$1"
+	local FILE="$2"
+
+	if [[ -f "$FILE" ]]; then
+		_msg "Arquivo encontrado: $FILE"
+		return 0
+	fi
+
+	_yellow "Baixando: $URL"
+	printf "%s" "[>] Destino: $FILE "
+	cd "$DIR_DOWNLOADS"
+	wget -q "$URL" -O "$FILE"
+
+	if [[ "$?" == '0' ]]; then
+		_syellow "OK"
+		return 0
+	else
+		_sred "(__download__) falha"
+		return 1
+	fi
+}
+
+__shasum__()
+{
+	# Esta função compara a hash de um arquivo local no disco com
+	# uma hash informada no parametro "$2" (hash original). 
+	#   Ou seja "$1" é o arquivo local e "$2" é uma hash
+
+	if [[ ! -f "$1" ]]; then
+		_red "(__shasum__) arquivo inválido: $1"
+		return 1
+	fi
+
+	if [[ -z "$2" ]]; then
+		_red "(__shasum__) use: __shasum__ <arquivo> <hash>"
+		return 1
+	fi
+
+	_yellow "Gerando hash do arquivo: $1"
+	local hash_file=$(sha256sum "$1" | cut -d ' ' -f 1)
+	
+	echo -ne "[>] Comparando valores "
+	if [[ "$hash_file" == "$2" ]]; then
+		echo -e "${CYellow}OK${CReset}"
+		return 0
+	else
+		_sred 'FALHA'
+		rm -rf "$1"
+		_red "(__shasum__) o arquivo inseguro foi removido: $1"
+		return 1
+	fi
+}
+
+
+__rmdir__()
+{
+	# Função para remover diretórios e arquivos, inclusive os arquivos é diretórios
+	# que o usuário não tem permissão de escrita, para isso será usado o "sudo".
+	#
+	# Use:
+	#     __rmdir__ <diretório> ou
+	#     __rmdir__ <arquivo>
+	[[ -z $1 ]] && return 1
+
+	# Se o arquivo/diretório não for removido por falta de privilegio 'root'
+	# A função __sudo__ irá remover o arquivo/diretório.
+	while [[ $1 ]]; do
+		printf "[>] Removendo: $1 "
+		if rm -rf "$1" 2> /dev/null || sudo rm -rf "$1"; then
+			_syellow "OK"
+		else
+			_sred "FALHA"
+		fi
+		shift
+	done
+}
+
+_clean_temp_dirs()
+{
+	cd "$DIR_TEMP"
+	cd "$DirUnpack" && __rmdir__ $(ls) 
+}
+
+_unpack()
+{
+	# Obrigatório informar um arquivo no argumento $1.
+	if [[ ! -f "$1" ]]; then
+		_red "(_unpack) nenhum arquivo informado como argumento"
+		return 1
+	fi
+
+	# Destino para descompressão.
+	if [[ -d "$2" ]]; then 
+		DirUnpack="$2"
+	elif [[ -d "$DirUnpack" ]]; then
+		DirUnpack="$DirUnpack"
+	else
+		_red "(_unpack): nenhum diretório para descompressão foi informado"
+		return 1
+	fi 
+	
+	cd "$DirUnpack"
+	path_file="$1"
+
+	# Detectar a extensão do arquivo.
+	if [[ "${path_file: -6}" == 'tar.gz' ]]; then    # tar.gz - 6 ultimos caracteres.
+		type_file='tar.gz'
+	elif [[ "${path_file: -7}" == 'tar.bz2' ]]; then # tar.bz2 - 7 ultimos carcteres.
+		type_file='tar.bz2'
+	elif [[ "${path_file: -6}" == 'tar.xz' ]]; then  # tar.xz
+		type_file='tar.xz'
+	elif [[ "${path_file: -4}" == '.zip' ]]; then    # .zip
+		type_file='zip'
+	elif [[ "${path_file: -4}" == '.deb' ]]; then    # .deb
+		type_file='deb'
+	else
+		_red "(_unpack) arquivo não suportado: $path_file"
+		__rmdir__ "$path_file"
+		return 1
+	fi
+
+	printf "%s\n" "[>] Descomprimindo: $path_file "
+	printf "%s" "[>] Destino: $DirUnpack "
+	
+	# Descomprimir.	
+	case "$type_file" in
+		'tar.gz') tar -zxvf "$path_file" -C "$DirUnpack" 1> /dev/null 2>&1;;
+		'tar.bz2') tar -jxvf "$path_file" -C "$DirUnpack" 1> /dev/null 2>&1;;
+		'tar.xz') tar -Jxf "$path_file" -C "$DirUnpack" 1> /dev/null 2>&1;;
+		zip) unzip "$path_file" -d "$DirUnpack" 1> /dev/null 2>&1;;
+		deb) ar -x "$path_file" 1> /dev/null;;
+		*) return 1;;
+	esac
+
+	if [[ "$?" == '0' ]]; then
+		_syellow "OK"
+		return 0
+	else
+		_sred "FALHA"
+		_red "(_unpack) erro: $path_file"
+		__rmdir__ "$path_file"
+		return 1
+	fi
+}
+
+
+_config_debian_libs()
+{
+	__download__ "$URLlibsslDeb9" "$FileLIBssl1Debian9" || return 1	      # libssl 1.0.2 amd64 deb 9
+	__download__ "$URLlibsslDeb8" "$FileLIBssl1Debian8" || return 1   # libssl 1.0 amd64 deb 8
+	__download__ "$URLlibcurl3Deb9" "$FileLIBcurl3Debian9" || return 1 # libcurl3 amd64
+
+	__shasum__ "$FileLIBssl1Debian9" "$hashFileLIBssl1Debian9" || return 1
+	__shasum__ "$FileLIBssl1Debian8" "$hashFileLIBssl1Debian8" || return 1
+	__shasum__ "$FileLIBcurl3Debian9" "$hashFileLIBcurl3Debian9" || return 1
+
+	# libncurses5
+	if [[ $(aptitude show libncurses5 | grep '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
+		_msg "Instalando: libncurses5"
+		sudo apt install -y libncurses5
+	fi
+
+	# multiarch-support
+	if [[ $(aptitude show multiarch-support | grep '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
+		_msg "Instalando: libncurses5"
+		sudo apt install -y multiarch-support
+	fi
+
+	# libsdl-ttf2
+	if [[ $(aptitude show libsdl-ttf2.0-0 | grep -m 1 '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
+		_msg "Instalando: libsdl-ttf2.0-0"
+		sudo apt install -y libsdl-ttf2.0-0
+	fi
+
+	# libssl1.0.2 deb9 amd64 - instalar o pacote com o gdebi
+	if [[ $(aptitude show libssl1.0.2 | grep '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
+		_msg "Instalando: $FileLIBssl1Debian9"
+		sudo gdebi "$FileLIBssl1Debian9" 
+	fi
+
+	# libssl1.0.0 deb8 amd64
+	if [[ $(aptitude show libssl1.0.0 | grep '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
+		_msg "Instalando: $FileLIBssl1Debian8"
+		sudo gdebi "$FileLIBssl1Debian8"
+	fi
+
+	# Extrair libcurl3
+	_unpack "$FileLIBcurl3Debian9" || return 1
+	_unpack "$DirUnpack"/data.tar.xz || return 1
+	cd "$DirUnpack"/usr/lib/x86_64-linux-gnu
+
+	# Para reverter essa configuração caso o 'curl' apresentar erros, use o seguinte comando
+	# sudo ln -sf /lib/x86_64-linux-gnu/libcurl.so.4.5.0 /lib/x86_64-linux-gnu/libcurl.so.4
+	#
+	_msg "Configurando: /lib/x86_64-linux-gnu/libcurl.so.4.4.0"
+	sudo cp -v -n libcurl.so.3 '/usr/lib/x86_64-linux-gnu/libcurl.so.3'
+	sudo cp -v -n libcurl.so.4 '/lib/x86_64-linux-gnu/libcurl.so.4'
+	sudo cp -v -n libcurl.so.4.4.0 '/lib/x86_64-linux-gnu/libcurl.so.4.4.0'
+	sudo ln -sf '/lib/x86_64-linux-gnu/libcurl.so.4.4.0' '/lib/x86_64-linux-gnu/libcurl.so.4'
+}
 
 #---------------------[ Função para instalar o programa ]---------------------#
-function _inst_eps() 
+_install_epsxe() 
 {
+	__download__ "$URLepsxeIcon" "${HOME}/.icons/ePSXe.svg" # Icone.
+	__download__ "$UrlEpsxeZip" "$epsxeZipFile"             # Arquivo de instalação .zip
+	__shasum__ "$epsxeZipFile" "$hashepsxeZipFile" || return 1
 
-# Instalar dependências.
-_msgs "$verde" "==> ${fecha}Instalando: libncurses5 libsdl-ttf2.0-0 unzip"
-sudo sh -c 'apt update; apt -y install libncurses5 libsdl-ttf2.0-0 unzip'
-
-[[ $? == "0" ]] || exit 1
-
-#----------------------------[ Baixar arquivos ]---------------#
-
-# ePSxe.zip
-[[ $(sha256sum "$arq_epsxe_zip" | cut -d ' ' -f 1) == "$hash_epsxe" ]] || {
-	echo -e "${Verde}Baixando:${fecha} $arq_epsxe_zip"
-	wget "$link_down_epsxe" -O "$arq_epsxe_zip"
-}
-
-# libssl 1.0.2 amd64 deb 9
-[[ $(sha256sum "$arq_libssl1_deb9_amd64" | cut -d ' ' -f 1) == "$hash_libssl1_0_2_deb9_amd64" ]] || {
-	echo -e "${Verde}Baixando:${fecha} $arq_libssl1_deb9_amd64"
-	wget "$link_libssl_deb9_amd64" -O "$arq_libssl1_deb9_amd64"	
-}
-
-# libssl 1.0 amd64 deb 8
-[[ $(sha256sum "$arq_libssl1_deb8_amd64" | cut -d ' ' -f 1) == "$hash_libssl1_deb8_amd64" ]] || {
-	echo -e "${Verde}Baixando:${fecha} $arq_libssl1_deb8_amd64"
-	wget "$link_libssl_deb8_amd64" -O "$arq_libssl1_deb8_amd64"
-}
-
-# libcurl3 amd64
-[[ $(sha256sum "$arq_libcurl3_deb9_amd64" | cut -d ' ' -f 1) == "$hash_libcurl3_7_deb9_amd64" ]] || {
-	echo -e "${Verde}Baixando:${fecha} $arq_libcurl3_deb9_amd64"
-	wget "$link_libcurl3_deb9_amd64" -O "$arq_libcurl3_deb9_amd64"
-}
-
-#================================== Copia dos downloads =================================#
-_msgs "$verde" "==> ${fecha}Fazendo backup de $DIR_TEMP em ~/Downloads"
-cp -vu "$DIR_TEMP"/* ~/Downloads 1> /dev/null 2>&1
-sleep 3
-
-#============================== Descompactar e instalar =================================#
-[[ $(sha256sum "$HOME"/.local/bin/epsxe-amd64/epsxe_x64 | cut -d ' ' -f 1) == "$hash_bin_epsxe_amd64" ]] || {
-
+	#============================== Descompactar e instalar =================================#
 	# Backup da versão anterior.
-	cp -ru "$HOME"/.local/bin/epsxe-amd64/* "${HOME}"/.local/bin/epsxe-amd64-old/ 1> /dev/null 2>&1
-	rm -rf "$HOME"/.local/bin/epsxe-amd64/* 1> /dev/null 2>&1
+	if [[ -d "$DIR_BIN/epsxe-amd64" ]]; then
+		_msg "Fazendo backup da versão instalada anteriormente"
+		cp -R -u "$DIR_BIN"/epsxe-amd64 "$destinationBackupDir" 1> /dev/null
+		rm -rf "$DIR_BIN"/epsxe-amd64
+	fi
 
-	_msgs "$verde" "==> ${fecha}Instalando: $HOME/.local/bin/epsxe-amd64/epsxe_x64"
-	unzip "$arq_epsxe_zip" -d "$HOME"/.local/bin/epsxe-amd64
-	chmod -R +x "$HOME"/.local/bin/epsxe-amd64
-	ln -sf "$HOME"/.local/bin/epsxe-amd64/epsxe_x64 ~/.local/bin/epsxe
-}
+	[[ ! -d "$DIR_BIN/epsxe-amd64" ]] && mkdir "$DIR_BIN/epsxe-amd64"
 
-# libssl1.0.2 deb9 amd64
-[[ $(aptitude show libssl1.0.2 | grep '^Estado' | cut -d ' ' -f 2) == 'instalado' ]] || { 
-	_msgs "$verde" "==> ${fecha}$arq_libssl1_deb9_amd64"; sudo gdebi-gtk "$arq_libssl1_deb9_amd64" 
-}
+	_unpack "$epsxeZipFile" || return 1
+	cd "$DirUnpack"
+	cp -R -u epsxe_x64 "$DIR_BIN"/epsxe-amd64/
+	chmod -R +x "$DIR_BIN"/epsxe-amd64
+	ln -sf "$DIR_BIN"/epsxe-amd64/epsxe_x64 "$destinationLinkEpsxe"
 
-# libssl1.0.0 deb8 amd64
-[[ $(aptitude show libssl1.0.0 | grep '^Estado' | cut -d ' ' -f 2) == 'instalado' ]] || {
-	_msgs "$verde" "==> ${fecha}$arq_libssl1_deb8_amd64"; sudo gdebi-gtk "$arq_libssl1_deb8_amd64"
-}
+	echo "[Desktop Entry]" > "${HOME}/.local/share/applications/ePSXe.desktop"
+		{
+		  echo "Type=Application"
+		  echo "Terminal=false"
+		  echo "Exec=$HOME/.local/bin/epsxe-amd64/epsxe_x64"
+		  echo "Name=ePSXe"
+		  echo "Comment=Emulador PS1"
+		  echo "Icon=${HOME}/.icons/ePSXe.svg"
+		  echo "Categories=Game;Emulator;"
+		} >> "${HOME}/.local/share/applications/ePSXe.desktop"
 
-# Extrair libcurl3
-sudo rm -rf "$DIR_LIBS"/* 1> /dev/null 2>&1 # Limpar o diretório de extração.
-sudo dpkg-deb -x "$arq_libcurl3_deb9_amd64" "$DIR_LIBS"
+	if is_executable "$destinationLinkEpsxe"; then 
+		cp -u "${HOME}/.local/share/applications/ePSXe.desktop" ~/Desktop/ 1>/dev/null 2>&1
+		cp -u "${HOME}/.local/share/applications/ePSXe.desktop" ~/'Área de trabalho'/ 1>/dev/null 2>&1
+		#"$destinationLinkEpsxe" # Abrir o epsxe.
+	fi
 
-sudo cp -vu "${DIR_LIBS}"/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0 '/usr/lib/x86_64-linux-gnu/'
-sudo cp -vu "${DIR_LIBS}"/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0 '/lib/x86_64-linux-gnu/libcurl.so.4.4.0'
-
-sudo ln -sf '/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0' '/usr/lib/x86_64-linux-gnu/libcurl.so.4'
-sudo ln -sf '/lib/x86_64-linux-gnu/libcurl.so.4.4.0' '/lib/x86_64-linux-gnu/libcurl.so.4'
-
-wget "$epsxe_icon" -O "${HOME}/.icons/ePSXe.svg" # Icone.
-
-echo "[Desktop Entry]" > "${HOME}/.local/share/applications/ePSXe.desktop"
-	{
-	  echo "Type=Application"
-	  echo "Terminal=false"
-	  echo "Exec=$HOME/.local/bin/epsxe-amd64/epsxe_x64"
-	  echo "Name=ePSXe"
-	  echo "Comment=Emulador PS1"
-	  echo "Icon=${HOME}/.icons/ePSXe.svg"
-	  echo "Categories=Game;Emulator;"
-	} >> "${HOME}/.local/share/applications/ePSXe.desktop"
-
-
-if [[ "$?" == "0" ]]; then 
-	
-	cp -u "${HOME}/.local/share/applications/ePSXe.desktop" ~/Desktop 1>/dev/null 2>&1
-	cp -u "${HOME}/.local/share/applications/ePSXe.desktop" ~/'Área de trabalho' 1>/dev/null 2>&1
-	"$HOME"/.local/bin/epsxe-amd64/epsxe_x64 # Abrir o epsxe.
-
-fi
-} # Fim de _inst_eps
-
+	# Instalar dependências e libs.
+	_config_debian_libs || return 1
+	return
+} 
 
 #---------------------------[ Função para desinstalar o programa ]--------------#
-function _remove_epsxe()
+_remove_epsxe()
 {
 
-remover=$(_msgs_zenity "--question" "Desinstalar" "Deseja remover ePSxe ?" "400" "150")
+remover=$(_msg_zenity "--question" "Desinstalar" "Deseja remover ePSxe ?" "400" "150")
 
 	if [[ $? == 0 ]]; then
-		
 		sudo rm '/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0' 1> /dev/null 2>&1
 		sudo rm '/lib/x86_64-linux-gnu/libcurl.so.4.4.0' 1> /dev/null 2>&1
 		
-		[[ -f /usr/lib/x86_64-linux-gnu/libcurl.so.4.5.0 ]] && {
+		if [[ -f /usr/lib/x86_64-linux-gnu/libcurl.so.4.5.0 ]]; then
+			_msg "Configurando (libcurl.so.4.5): /usr/lib/x86_64-linux-gnu/libcurl.so.4.5.0"
 			sudo ln -sf /usr/lib/x86_64-linux-gnu/libcurl.so.4.5.0 '/usr/lib/x86_64-linux-gnu/libcurl.so.4' 
-		}
-		
-		[[ -f /lib/x86_64-linux-gnu/libcurl.so.4.5.0 ]] && {
-			sudo ln -sf /lib/x86_64-linux-gnu/libcurl.so.4.5.0 '/lib/x86_64-linux-gnu/libcurl.so.4'
-		}
+		fi
 		
 		sudo aptitude remove libssl1.0.0
 		sudo aptitude remove libssl1.0.2
@@ -306,94 +489,100 @@ remover=$(_msgs_zenity "--question" "Desinstalar" "Deseja remover ePSxe ?" "400"
 		rm -rf ~/.local/share/applications/ePSXe.desktop 1> /dev/null 2>&1
 		rm -rf ~/.icons/ePSXe.svg 1> /dev/null 2>&1
 		
-	_msgs_zenity "--info" "Operação finalizada" "ePSXe desinstalado" "450" "150"
+		_msg_zenity "--info" "Operação finalizada" "ePSXe desinstalado" "450" "150"
 	fi
 
 }
 
 
 #-------------------------------[ Configuração da  Bios ]-------------------------------#
-function _config_bios() {
+_config_bios() {
 
-	arq_bios=$(_msgs_zenity "--file-selection" "Selecione o arquivo .bin" "*.bin" "*.BIN")
+	epsxeBiosPath=$(_msg_zenity "--file-selection" "Selecione o arquivo .bin" "*.bin" "*.BIN")
 		
-		# Arquivo inválido, sair do programa.
-		[[ -z "$arq_bios" ]] && exit 1 
+	# Arquivo inválido, sair do programa.
+	[[ ! -f "$epsxeBiosPath" ]] && return 1 
 		
-	sed -i "s|^BiosPath = .*|BiosPath = $arq_bios|g" "$arq_configuracao"
-	grep --max-count=1 '^BiosPath' "$arq_configuracao"	
-	_msgs_zenity "--info" "Configuração da bios" "Bios configurada: $arq_bios" "550" "150"
+	sed -i "s|^BiosPath = .*|BiosPath = $epsxeBiosPath|g" "$epsxeConfigFile"
+	grep --max-count=1 '^BiosPath' "$epsxeConfigFile"	
+	_msg_zenity "--info" "Configuração da bios" "Bios configurada: $epsxeBiosPath" "550" "150"
 	
 }
 
 #----------------------------[ Configuração MemCards ]----------------#
-function _config_memcards() {
+_config_memcards() {
 
-	arq_memcard1=$(_msgs_zenity "--file-selection" "Selecione o memorycard 1 .mcr" "*.mcr")
+	epsxeMemcard1Path=$(_msg_zenity "--file-selection" "Selecione o memorycard 1 .mcr" "*.mcr")
 
-		[[ -z "$arq_memcard1" ]] && exit 1
+	[[ ! -f "$epsxeMemcard1Path" ]] && return 1
 
-	sed -i "s|^MemcardPath1 = .*|MemcardPath1 = $arq_memcard1|g" "$arq_configuracao"
-	grep --max-count=1 '^MemcardPath1' "$arq_configuracao"
-	_msgs_zenity "--info" "Configuração memory card 1" "Memory Card 1 configurado: $arq_memcard1" "600" "150"
+	sed -i "s|^MemcardPath1 = .*|MemcardPath1 = $epsxeMemcard1Path|g" "$epsxeConfigFile"
+	grep --max-count=1 '^MemcardPath1' "$epsxeConfigFile"
+	_msg_zenity "--info" "Configuração memory card 1" "Memory Card 1 configurado: $epsxeMemcard1Path" "600" "150"
 	
-	arq_memcard2=$(_msgs_zenity "--file-selection" "Selecione o memorycard 2 .mcr" "*.mcr")
+	epsxeMemcard2Path=$(_msg_zenity "--file-selection" "Selecione o memorycard 2 .mcr" "*.mcr")
 
-		[[ -z "$arq_memcard2" ]] && exit 1
+	[[ ! -f "$epsxeMemcard2Path" ]] && return 1
 
-	sed -i "s|^MemcardPath2 = .*|MemcardPath2 = $arq_memcard2|g" "$arq_configuracao"
-	grep --max-count=1 '^MemcardPath2' "$arq_configuracao"
-	_msgs_zenity "--info" "Configuração memory card 2" "Memory Card 2 configurado: $arq_memcard2" "600" "150"
+	sed -i "s|^MemcardPath2 = .*|MemcardPath2 = $epsxeMemcard2Path|g" "$epsxeConfigFile"
+	grep --max-count=1 '^MemcardPath2' "$epsxeConfigFile"
+	_msg_zenity "--info" "Configuração memory card 2" "Memory Card 2 configurado: $epsxeMemcard2Path" "600" "150"
 
 }
 
 #-----------------------------[ Função menu configuração ]-----------#
-function _configurar_epsxe()
+_configurar_epsxe()
 {
 
 while :; do
-
-# 1=acao, 2=titulo, 3=texto, 4=largura, 5=altura, 6=nome da coluna, 7=lista de opções
-lista_opcoes="TRUE Bios FALSE MemoryCards FALSE Sair"
-menu_config=$(_msgs_zenity "--list" "Configurar ePSxe" "Selecione uma configuração" "430" "450" "Configurações" "$lista_opcoes")
+	# $1=acao 
+	# $2=titulo 
+	# $3=texto
+	# $4=largura 
+	# $5=altura
+	# $6=nome da coluna
+	# $7=lista de opções
+	#
+	options_list="TRUE Bios FALSE MemoryCards FALSE Sair"
+	menu_config=$(_msg_zenity "--list" "Configurar ePSxe" "Selecione uma configuração" "430" "450" "Configurações" "$options_list")
 
 	case "$menu_config" in
-		Sair) break && exit 0;;	
-		Bios) (_config_bios);;
-		MemoryCards) (_config_memcards);;
+		Sair) break; return 0;;	
+		Bios) _config_bios;;
+		MemoryCards) _config_memcards;;
+		*) _yellow "Saindo..."; break; return;;
 	esac
-	[[ "$?" != "0" ]] && break && exit 1
-	
 done
-
 }
 
 #--------------------------------------[ Argumentos ]----------------------#
-if [[ ! -z "$1" ]]; then
-	if [[ "$#" > 3 ]]; then
-		_msgs_zenity "--error" "Erro" "Use no máximo 3 argumentos" "350" "100"
-		(usage)
+argument_parser()
+{
+	if [[ -z $1 ]]; then
+		_install_epsxe || return 1
+		_configurar_epsxe || return 1
+		return 0
 	fi
 
 	while [[ "$1" ]]; do
 		case "$1" in
-			-c|--configure) (_configurar_epsxe);;
-			-i|--install) (_inst_eps);;
-			-h|--help) (usage);;
-			-r|--remove) (_remove_epsxe);;
-			-v|--version) grep '^# Versão:' $0 | sed 's|^# ||g';;
-			*) (usage); break; exit 1;;
-		
+			-c|--configure) _configurar_epsxe;;
+			-i|--install) _install_epsxe;;
+			-h|--help) usage; return; break;;
+			-r|--remove) _remove_epsxe;;
+			-v|--version) echo -e " V${__version__}"; return 0; break;;
+			*) usage; return 1; break;;
 		esac
 		shift
 	done
-elif [[ -z "$1" ]]; then
-	(_inst_eps)
-	(_configurar_epsxe)
-fi
+}
 
-_msgs "$verde" "==> ${fecha}Limpando cache"
-sudo rm -rf "$DIR_LIBS" 1> /dev/null 2>&1
-sudo rm -rf "$DIR_TEMP"
+main()
+{
+	_clean_temp_dirs
+	_check_cli_requeriments
+	argument_parser "$@"
+	return "$?"
+}
 
-#sudo -K # Resetar senha sudo.
+main "$@"
