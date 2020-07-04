@@ -498,13 +498,13 @@ _install_epsxe()
 		__rmdir__ "$destinationLinkEpsxe"
 	fi
 
-	#echo '#!/usr/bin/env bash' | tee "$destinationLinkEpsxe"
+	echo '#!/bin/sh' > "$destinationLinkEpsxe"
 	{
 		echo ' '
-		echo "export LD_LIBRARY_PATH=$DebianDestinationLibs"
+		#echo "export LD_LIBRARY_PATH=$DebianDestinationLibs"
 		echo "cd $DIR_BIN/epsxe-amd64"
-		echo './epsxe_x64 $@'
-	} | tee "$destinationLinkEpsxe"
+		echo './epsxe_x64 "$@"'
+	} >> "$destinationLinkEpsxe"
 
 	echo "[Desktop Entry]" > "${HOME}/.local/share/applications/ePSXe.desktop"
 		{
