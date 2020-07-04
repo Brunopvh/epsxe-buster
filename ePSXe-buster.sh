@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Autor: Bruno Chaves
-__version__='2020-07-03'
+__version__='2020-07-04'
 # Ultima modificação: 2019-010-03
 #
 # Este programa istala o emulador ePSxe versão 64 bits no debian 10.
@@ -510,7 +510,7 @@ _install_epsxe()
 		{
 		  echo "Type=Application"
 		  echo "Terminal=false"
-		  echo "Exec=sh $HOME/.local/bin/epsxe-amd64/epsxe_x64"
+		  echo "Exec=$HOME/.local/bin/epsxe-amd64/epsxe_x64"
 		  echo "Name=ePSXe"
 		  echo "Comment=Emulador PS1"
 		  echo "Icon=${HOME}/.icons/ePSXe.svg"
