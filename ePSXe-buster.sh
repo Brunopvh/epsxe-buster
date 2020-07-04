@@ -106,6 +106,7 @@ URLlibsslDeb8="http://security.debian.org/debian-security/pool/updates/main/o/op
 URLlibcurl3Deb9="http://ftp.us.debian.org/debian/pool/main/c/curl/libcurl3_7.52.1-5+deb9u9_amd64.deb"
 URLlibcurl4Debian="http://ftp.us.debian.org/debian/pool/main/c/curl/libcurl4_7.65.3-1_amd64.deb"
 URLlibcurl3Ubuntu='http://archive.ubuntu.com/ubuntu/pool/main/c/curl3/libcurl3_7.58.0-2ubuntu2_amd64.deb'
+URLecmDeb='http://ftp.us.debian.org/debian/pool/main/c/cmdpack/ecm_1.03-1+b1_amd64.deb'
 
 # Destino de cada arquivo .deb baixado
 FileLIBcurl3Debian9="${DIR_DOWNLOADS}/$(basename $URLlibcurl3Deb9)"
@@ -113,6 +114,7 @@ FileLIBcurl4Debian="${DIR_DOWNLOADS}/$(basename $URLlibcurl4Debian)"
 FileLIBssl1Debian9="${DIR_DOWNLOADS}/$(basename $URLlibsslDeb9)"
 FileLIBssl1Debian8="${DIR_DOWNLOADS}/$(basename $URLlibsslDeb8)"
 FileLIBcurl3Ubuntu="${DIR_DOWNLOADS}/$(basename $URLlibcurl3Ubuntu)"
+FileEcmDebian="${DIR_DOWNLOADS}/$(basename $URLecmDeb)"
 
 # Arquivos relacionados ao epsxe
 epsxeZipFile="$DIR_DOWNLOADS"/epsxe-amd64.zip
@@ -124,6 +126,7 @@ hashFileLIBcurl3Debian9='f8c55748a97693588c83a0f272cdb1943d8efb55c4d0485e543a7d4
 hashFileLIBcurl4Debian='b82dd3fb8bb1df71fa0a0482df0356cd0eddf516a65f3fe3dad6be82490f1aca'
 hashFileLIBssl1Debian8='c91f6f016d0b02392cbd2ca4b04ff7404fbe54a7f4ca514dc1c499e3f5da23a2'
 hashFileLIBssl1Debian9='a208d375182830bdcad42c0b92154d55233d7cfe4a7543015d6a99c5086416c0'
+hashFileEcmDebian='ebc021c4579f55cdbe5b2335fca90507146a6982b2609781e27cd3436e298d53'
 hashepsxeZipFile='60a99db5f400328bebe0a972caea6206d1a24d59a092248c0b5fc12e184eca99'
 hash_bin_epsxe_amd64='c3f1d88d0e9075e04073237e5dfda6c851ce83af29e912f62baaf67af8a52579'
 
@@ -418,28 +421,40 @@ _config_ubuntu_libs()
 
 _config_debian_libs()
 {
+	local DebianDestinationLibs='/lib/x86_64-linux-gnu/'
+	#local DebianDestinationLibs="$HOME/.local/lib"
+	mkdir -p "$DebianDestinationLibs"
+	
 	__download__ "$URLlibsslDeb9" "$FileLIBssl1Debian9" || return 1	     # libssl 1.0.2 amd64 deb 9
 	__download__ "$URLlibsslDeb8" "$FileLIBssl1Debian8" || return 1      # libssl 1.0 amd64 deb 8
 	__download__ "$URLlibcurl3Deb9" "$FileLIBcurl3Debian9" || return 1   # libcurl3 amd64
+	__download__ "$URLecmDeb" "$FileEcmDebian" || return 1               # ecm.deb
 
 	__shasum__ "$FileLIBssl1Debian9" "$hashFileLIBssl1Debian9" || return 1
 	__shasum__ "$FileLIBssl1Debian8" "$hashFileLIBssl1Debian8" || return 1
 	__shasum__ "$FileLIBcurl3Debian9" "$hashFileLIBcurl3Debian9" || return 1
+	__shasum__ "$FileEcmDebian" "$hashFileEcmDebian" || return 1
 
 	# libncurses5
 	_msg "Instalando: libncurses5 multiarch-support libsdl-ttf2.0-0"
 	sudo apt install -y libncurses5 multiarch-support libsdl-ttf2.0-0
 
 	# libssl1.0.2 deb9 amd64 - instalar o pacote com o gdebi
-	if [[ $(aptitude show libssl1.0.2 | grep '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
+	if [[ $(aptitude show libssl1.0.2 | egrep -m 1 '(Estado|State)' | cut -d ' ' -f 2) != 'instalado' ]]; then
 		_msg "Instalando: $FileLIBssl1Debian9"
 		sudo gdebi "$FileLIBssl1Debian9" 
 	fi
 
 	# libssl1.0.0 deb8 amd64
-	if [[ $(aptitude show libssl1.0.0 | grep '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
+	if [[ $(aptitude show libssl1.0.0 | egrep -m 1 '(Estado|State)' | cut -d ' ' -f 2) != 'instalado' ]]; then
 		_msg "Instalando: $FileLIBssl1Debian8"
 		sudo gdebi "$FileLIBssl1Debian8"
+	fi
+
+	# ecm.deb
+	if [[ $(aptitude show ecm | egrep -m 1 '(Estado|State)' | cut -d ' ' -f 2) != 'instalado' ]]; then
+		_msg "Instalando: $FileEcmDebian"
+		sudo gdebi "$FileEcmDebian"
 	fi
 
 	# Extrair libcurl3
@@ -450,14 +465,14 @@ _config_debian_libs()
 	# Para reverter essa configuração caso o 'curl' apresentar erros, use o seguinte comando
 	# sudo ln -sf /lib/x86_64-linux-gnu/libcurl.so.4.5.0 /lib/x86_64-linux-gnu/libcurl.so.4 && sudo ldconfig
 	#
-	_msg "Configurando: /lib/x86_64-linux-gnu/libcurl.so.4.4.0"
-	sudo cp -v -n libcurl.so.3 '/usr/lib/x86_64-linux-gnu/libcurl.so.3'
-	sudo cp -v -n libcurl.so.4 '/lib/x86_64-linux-gnu/libcurl.so.4'
-	sudo cp -v -n libcurl.so.4.4.0 '/lib/x86_64-linux-gnu/libcurl.so.4.4.0'
-	sudo ln -sf '/lib/x86_64-linux-gnu/libcurl.so.4.4.0' '/lib/x86_64-linux-gnu/libcurl.so.4'
+	_msg "Configurando: $DebianDestinationLibs/libcurl.so.4.4.0"
+	sudo cp -v -n 'libcurl.so.3' "$DebianDestinationLibs/libcurl.so.3"
+	sudo cp -v -n 'libcurl.so.4' "$DebianDestinationLibs/libcurl.so.4"
+	sudo cp -v -n 'libcurl.so.4.4.0' "$DebianDestinationLibs/libcurl.so.4.4.0"
+	sudo ln -sf "$DebianDestinationLibs/libcurl.so.4.4.0" "$DebianDestinationLibs/libcurl.so.4"
 }
 
-#---------------------[ Função para instalar o programa ]---------------------#
+# Instalar o programa
 _install_epsxe() 
 {
 	__download__ "$URLepsxeIcon" "${HOME}/.icons/ePSXe.svg" # Icone.
@@ -477,32 +492,39 @@ _install_epsxe()
 	_unpack "$epsxeZipFile" || return 1
 	cd "$DirUnpack"
 	cp -R -u epsxe_x64 "$DIR_BIN"/epsxe-amd64/
-	chmod -R +x "$DIR_BIN"/epsxe-amd64
-	ln -sf "$DIR_BIN"/epsxe-amd64/epsxe_x64 "$destinationLinkEpsxe"
+	cp -R -u docs "$DIR_BIN"/epsxe-amd64/
+
+	if [[ -f "$destinationLinkEpsxe" ]] || [[ -L "$destinationLinkEpsxe" ]]; then
+		__rmdir__ "$destinationLinkEpsxe"
+	fi
+
+	#echo '#!/usr/bin/env bash' | tee "$destinationLinkEpsxe"
+	{
+		echo ' '
+		echo "export LD_LIBRARY_PATH=$DebianDestinationLibs"
+		echo "cd $DIR_BIN/epsxe-amd64"
+		echo './epsxe_x64 $@'
+	} | tee "$destinationLinkEpsxe"
 
 	echo "[Desktop Entry]" > "${HOME}/.local/share/applications/ePSXe.desktop"
 		{
 		  echo "Type=Application"
 		  echo "Terminal=false"
-		  echo "Exec=$HOME/.local/bin/epsxe-amd64/epsxe_x64"
+		  echo "Exec=sh $HOME/.local/bin/epsxe-amd64/epsxe_x64"
 		  echo "Name=ePSXe"
 		  echo "Comment=Emulador PS1"
 		  echo "Icon=${HOME}/.icons/ePSXe.svg"
 		  echo "Categories=Game;Emulator;"
 		} >> "${HOME}/.local/share/applications/ePSXe.desktop"
 
+	chmod -R +x "$DIR_BIN"/epsxe-amd64
+	chmod +x "$destinationLinkEpsxe"
+
 	if is_executable "$destinationLinkEpsxe"; then 
 		cp -u "${HOME}/.local/share/applications/ePSXe.desktop" ~/Desktop/ 1>/dev/null 2>&1
 		cp -u "${HOME}/.local/share/applications/ePSXe.desktop" ~/'Área de trabalho'/ 1>/dev/null 2>&1
 	fi
-
-	# Instalar dependências e libs para debian/ubuntu.
-	case "$os_name" in
-		debian) _config_debian_libs || return 1;;
-		ubuntu|linuxmint) _config_ubuntu_libs || return 1;;
-	esac
-	return 0
-} 
+}
 
 #---------------------------[ Função para desinstalar o programa ]--------------#
 _remove_epsxe()
@@ -594,9 +616,10 @@ while :; do
 done
 }
 
-#--------------------------------------[ Argumentos ]----------------------#
-argument_parser()
+main()
 {
+	_clean_temp_dirs
+	
 	if [[ -z $1 ]]; then
 		usage
 		return 1
@@ -606,7 +629,14 @@ argument_parser()
 		case "$1" in
 			-i|--install) 
 						#sudo apt update
-						_check_cli_requeriments && _install_epsxe
+						_check_cli_requeriments
+						_install_epsxe
+
+						# Instalar dependências e libs para debian/ubuntu.
+						case "$os_name" in
+							debian) _config_debian_libs || return 1;;
+							ubuntu|linuxmint) _config_ubuntu_libs || return 1;;
+						esac
 						"$DIR_BIN/epsxe"	
 						;;
 			-c|--configure) _configure_epsxe;;
@@ -617,12 +647,7 @@ argument_parser()
 		esac
 		shift
 	done
-}
 
-main()
-{
-	_clean_temp_dirs
-	argument_parser "$@"
 	return "$?"
 }
 
