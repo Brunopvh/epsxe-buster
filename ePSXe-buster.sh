@@ -65,16 +65,26 @@ fi
 # Path do programa no disco.
 export readonly dir_root=$(dirname $(readlink -f "$0"))
 
+# Nome do sistema
+export os_name=$(grep '^ID=' /etc/os-release | sed 's|.*=||g')
+
+case "$os_name" in
+	debian) ;;
+	ubuntu|linuxmint) ;;
+	*) _red 'Seu sistema não é suportado por este programa.'; exit 1;;
+esac
+
 # Codinome
 export os_codename=$(grep '^VERSION_CODENAME' /etc/os-release | sed 's|.*=||g') 
+export os_version_id=$(grep 'VERSION_ID=' /etc/os-release | sed 's/.*=//g;s/"//g' | cut -c -2)
 
-# Sistema
-export os_name=$(grep '^ID=' /etc/os-release | sed 's|.*=||g') 
+case "$os_version_id" in
+	10|18|19) ;; # Debian 10/Ubuntu 18.04/LinuxMint/19.X
+	*) _red 'Seu sistema não é suportado - suporte apenas para (Debian 10 | Ubuntu 18.04 | LinuxMint 19.X)'; exit 1;;
+esac
 
-if [[ "$os_codename" != "buster" ]]; then
-	_red 'Seu sistema não é suportado por este programa.'
-	exit 1
-fi
+_msg "Sistema: $os_name $os_version_id"
+
 
 #DIR_TEMP=$(mktemp -d)
 DIR_TEMP="/tmp/epsxe_$USER";                                     mkdir -p "$DIR_TEMP"
@@ -86,24 +96,30 @@ destinationBackupDir="$HOME"/ePSXe_backups/$(date "+%F-%T-%Z");  mkdir -p "$dest
 
 mkdir -p "${HOME}/.icons" 
 
+# Urls de downloads do icone e do arquivo de instalação .zip
 UrlEpsxeZip="http://www.epsxe.com/files/ePSXe205linux_x64.zip"
 URLepsxeIcon="https://raw.githubusercontent.com/brandleesee/ePSXe64Ubuntu/master/.ePSXe.svg"
 
+# Urls dos pacotes .deb queridos pelo epsxe. 
 URLlibsslDeb9='http://ftp.us.debian.org/debian/pool/main/o/openssl1.0/libssl1.0.2_1.0.2u-1~deb9u1_amd64.deb'
 URLlibsslDeb8="http://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u12_amd64.deb"
 URLlibcurl3Deb9="http://ftp.us.debian.org/debian/pool/main/c/curl/libcurl3_7.52.1-5+deb9u9_amd64.deb"
 URLlibcurl4Debian="http://ftp.us.debian.org/debian/pool/main/c/curl/libcurl4_7.65.3-1_amd64.deb"
+URLlibcurl3Ubuntu='http://archive.ubuntu.com/ubuntu/pool/main/c/curl3/libcurl3_7.58.0-2ubuntu2_amd64.deb'
 
+# Destino de cada arquivo .deb baixado
 FileLIBcurl3Debian9="${DIR_DOWNLOADS}/$(basename $URLlibcurl3Deb9)"
 FileLIBcurl4Debian="${DIR_DOWNLOADS}/$(basename $URLlibcurl4Debian)"
 FileLIBssl1Debian9="${DIR_DOWNLOADS}/$(basename $URLlibsslDeb9)"
 FileLIBssl1Debian8="${DIR_DOWNLOADS}/$(basename $URLlibsslDeb8)"
+FileLIBcurl3Ubuntu="${DIR_DOWNLOADS}/$(basename $URLlibcurl3Ubuntu)"
 
+# Arquivos relacionados ao epsxe
 epsxeZipFile="$DIR_DOWNLOADS"/epsxe-amd64.zip
 epsxeConfigFile="${destinationConfigDir}"/epsxerc
 destinationLinkEpsxe="$DIR_BIN/epsxe"
 
-# sha256sum
+# hash dos arquivos
 hashFileLIBcurl3Debian9='f8c55748a97693588c83a0f272cdb1943d8efb55c4d0485e543a7d43cd4a9637'
 hashFileLIBcurl4Debian='b82dd3fb8bb1df71fa0a0482df0356cd0eddf516a65f3fe3dad6be82490f1aca'
 hashFileLIBssl1Debian8='c91f6f016d0b02392cbd2ca4b04ff7404fbe54a7f4ca514dc1c499e3f5da23a2'
@@ -201,7 +217,9 @@ esac
 
 }
 
-#==================================== PATH ===================================#
+#======================================================================#
+# PATH
+#======================================================================#
 # Inserir ~/.local/bin em PATH se ainda não estiver disponível.
 if ! echo "$PATH" | grep "$HOME/.local/bin" 1> /dev/null; then
 	PATH="$HOME/.local/bin:$PATH"
@@ -209,6 +227,8 @@ fi
 
 [[ -f "$HOME/.bashrc" ]] || touch "$HOME/.bashrc"
 
+# Configuar o arquivo ~/.bashrc para inserir o diretório ~/.local/bin
+# na variável de ambiente PATH.
 if ! grep "^export PATH=.*$HOME/.local/bin" "$HOME"/.bashrc 1> /dev/null; then
 	_yellow "Configurando PATH no arquivo ~/.bashrc"
 	echo "export PATH=$HOME/.local/bin:$PATH" >> "${HOME}"/.bashrc  
@@ -364,34 +384,51 @@ _unpack()
 	fi
 }
 
+_config_ubuntu_libs()
+{
+	_msg "Instalando: libncurses5 libsdl-ttf2.0-0 libssl1.0.0 ecm"
+	sudo apt install -y libncurses5 libsdl-ttf2.0-0 libssl1.0.0 ecm
+
+	__download__ "$URLlibcurl3Deb9" "$FileLIBcurl3Debian9" || return 1   # libcurl3 amd64
+	__download__ "$URLlibsslDeb9" "$FileLIBssl1Debian9" || return 1	     # libssl 1.0.2 amd64 deb 9
+	__shasum__ "$FileLIBcurl3Debian9" "$hashFileLIBcurl3Debian9" || return 1
+	__shasum__ "$FileLIBssl1Debian9" "$hashFileLIBssl1Debian9" || return 1
+
+	# libssl1.0.2 deb9 amd64 - instalar o pacote com o gdebi
+	if [[ $(aptitude show libssl1.0.2 | egrep -m 1 '(Estado|State)' | cut -d ' ' -f 2) != 'instalado' ]]; then
+		_msg "Instalando: $FileLIBssl1Debian9"
+		sudo gdebi "$FileLIBssl1Debian9" 
+	fi
+	
+	_clean_temp_dirs
+	
+	# Extrair libcurl3
+	# sudo dpkg-deb -x "$FileLIBcurl3Debian9" "$DirUnpack"
+	_unpack "$FileLIBcurl3Debian9" || return 1
+	_unpack "$DirUnpack"/data.tar.xz || return 1
+	cd "$DirUnpack"/usr/lib/x86_64-linux-gnu
+
+	# Para reverter essa configuração caso o 'curl' apresentar erros, use o seguinte comando
+	# sudo ln -sf /lib/x86_64-linux-gnu/libcurl.so.4.5.0 /lib/x86_64-linux-gnu/libcurl.so.4 && sudo ldconfig
+	#
+	_msg "Configurando: /lib/x86_64-linux-gnu/libcurl.so.4.4.0"
+	sudo cp -v -u libcurl.so.4.4.0 '/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0'
+	sudo ln -sf '/usr/lib/x86_64-linux-gnu/libcurl.so.4.4.0' '/usr/lib/x86_64-linux-gnu/libcurl.so.4'
+}
 
 _config_debian_libs()
 {
-	__download__ "$URLlibsslDeb9" "$FileLIBssl1Debian9" || return 1	      # libssl 1.0.2 amd64 deb 9
-	__download__ "$URLlibsslDeb8" "$FileLIBssl1Debian8" || return 1   # libssl 1.0 amd64 deb 8
-	__download__ "$URLlibcurl3Deb9" "$FileLIBcurl3Debian9" || return 1 # libcurl3 amd64
+	__download__ "$URLlibsslDeb9" "$FileLIBssl1Debian9" || return 1	     # libssl 1.0.2 amd64 deb 9
+	__download__ "$URLlibsslDeb8" "$FileLIBssl1Debian8" || return 1      # libssl 1.0 amd64 deb 8
+	__download__ "$URLlibcurl3Deb9" "$FileLIBcurl3Debian9" || return 1   # libcurl3 amd64
 
 	__shasum__ "$FileLIBssl1Debian9" "$hashFileLIBssl1Debian9" || return 1
 	__shasum__ "$FileLIBssl1Debian8" "$hashFileLIBssl1Debian8" || return 1
 	__shasum__ "$FileLIBcurl3Debian9" "$hashFileLIBcurl3Debian9" || return 1
 
 	# libncurses5
-	if [[ $(aptitude show libncurses5 | grep '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
-		_msg "Instalando: libncurses5"
-		sudo apt install -y libncurses5
-	fi
-
-	# multiarch-support
-	if [[ $(aptitude show multiarch-support | grep '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
-		_msg "Instalando: libncurses5"
-		sudo apt install -y multiarch-support
-	fi
-
-	# libsdl-ttf2
-	if [[ $(aptitude show libsdl-ttf2.0-0 | grep -m 1 '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
-		_msg "Instalando: libsdl-ttf2.0-0"
-		sudo apt install -y libsdl-ttf2.0-0
-	fi
+	_msg "Instalando: libncurses5 multiarch-support libsdl-ttf2.0-0"
+	sudo apt install -y libncurses5 multiarch-support libsdl-ttf2.0-0
 
 	# libssl1.0.2 deb9 amd64 - instalar o pacote com o gdebi
 	if [[ $(aptitude show libssl1.0.2 | grep '^Estado' | cut -d ' ' -f 2) != 'instalado' ]]; then
@@ -411,7 +448,7 @@ _config_debian_libs()
 	cd "$DirUnpack"/usr/lib/x86_64-linux-gnu
 
 	# Para reverter essa configuração caso o 'curl' apresentar erros, use o seguinte comando
-	# sudo ln -sf /lib/x86_64-linux-gnu/libcurl.so.4.5.0 /lib/x86_64-linux-gnu/libcurl.so.4
+	# sudo ln -sf /lib/x86_64-linux-gnu/libcurl.so.4.5.0 /lib/x86_64-linux-gnu/libcurl.so.4 && sudo ldconfig
 	#
 	_msg "Configurando: /lib/x86_64-linux-gnu/libcurl.so.4.4.0"
 	sudo cp -v -n libcurl.so.3 '/usr/lib/x86_64-linux-gnu/libcurl.so.3'
@@ -457,12 +494,14 @@ _install_epsxe()
 	if is_executable "$destinationLinkEpsxe"; then 
 		cp -u "${HOME}/.local/share/applications/ePSXe.desktop" ~/Desktop/ 1>/dev/null 2>&1
 		cp -u "${HOME}/.local/share/applications/ePSXe.desktop" ~/'Área de trabalho'/ 1>/dev/null 2>&1
-		#"$destinationLinkEpsxe" # Abrir o epsxe.
 	fi
 
-	# Instalar dependências e libs.
-	_config_debian_libs || return 1
-	return
+	# Instalar dependências e libs para debian/ubuntu.
+	case "$os_name" in
+		debian) _config_debian_libs || return 1;;
+		ubuntu|linuxmint) _config_ubuntu_libs || return 1;;
+	esac
+	return 0
 } 
 
 #---------------------------[ Função para desinstalar o programa ]--------------#
@@ -480,9 +519,9 @@ remover=$(_msg_zenity "--question" "Desinstalar" "Deseja remover ePSxe ?" "400" 
 			sudo ln -sf /usr/lib/x86_64-linux-gnu/libcurl.so.4.5.0 '/usr/lib/x86_64-linux-gnu/libcurl.so.4' 
 		fi
 		
-		sudo aptitude remove libssl1.0.0
-		sudo aptitude remove libssl1.0.2
-		sudo ldconfig # Reconfigurar as libs.
+		_msg "Removendo: libssl1.0.2"; sudo aptitude remove libssl1.0.2
+		#sudo aptitude remove libssl1.0.0
+		_msg "Executando: sudo ldconfig"; sudo ldconfig # Reconfigurar as libs.
 		
 		rm -rf ~/.local/bin/epsxe-amd64 1> /dev/null 2>&1	
 		rm -rf ~/.local/bin/epsxe 1> /dev/null 2>&1	
@@ -531,7 +570,7 @@ _config_memcards() {
 }
 
 #-----------------------------[ Função menu configuração ]-----------#
-_configurar_epsxe()
+_configure_epsxe()
 {
 
 while :; do
@@ -559,15 +598,18 @@ done
 argument_parser()
 {
 	if [[ -z $1 ]]; then
-		_install_epsxe || return 1
-		_configurar_epsxe || return 1
-		return 0
+		usage
+		return 1
 	fi
 
 	while [[ "$1" ]]; do
 		case "$1" in
-			-c|--configure) _configurar_epsxe;;
-			-i|--install) _install_epsxe;;
+			-i|--install) 
+						#sudo apt update
+						_check_cli_requeriments && _install_epsxe
+						"$DIR_BIN/epsxe"	
+						;;
+			-c|--configure) _configure_epsxe;;
 			-h|--help) usage; return; break;;
 			-r|--remove) _remove_epsxe;;
 			-v|--version) echo -e " V${__version__}"; return 0; break;;
@@ -580,7 +622,6 @@ argument_parser()
 main()
 {
 	_clean_temp_dirs
-	_check_cli_requeriments
 	argument_parser "$@"
 	return "$?"
 }
