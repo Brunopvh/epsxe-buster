@@ -227,8 +227,6 @@ _msg_zenity()
 #
 # Resolução [--width="550" height="200", --width="300" height="150" ]
 
-
-
 case "$1" in
 --question) zenity "$1" --title="$2" --text="$3" --width="$4" --height="$5";;
 --info) zenity "$1" --title="$2" --text="$3" --width="$4" --height="$5";;
@@ -270,8 +268,8 @@ __download__()
 		return 0
 	fi
 
-	_yellow "Baixando: $URL"
-	printf "%s" "[>] Destino: $FILE "
+	_yellow "Baixando ... $URL"
+	printf "%s" "[>] Destino ... $FILE "
 	cd "$DIR_DOWNLOADS"
 	wget -q "$URL" -O "$FILE"
 
@@ -442,7 +440,6 @@ _config_ubuntu_libs()
 _config_debian_libs()
 {
 	local DebianDestinationLibs='/lib/x86_64-linux-gnu/'
-	#local DebianDestinationLibs="$HOME/.local/lib"
 	mkdir -p "$DebianDestinationLibs"
 	
 	__download__ "$URLlibsslDeb9" "$FileLIBssl1Debian9" || return 1	     # libssl 1.0.2 amd64 deb 9
@@ -555,8 +552,9 @@ remover=$(_msg_zenity "--question" "Desinstalar" "Deseja remover ePSxe ?" "400" 
 			sudo ln -sf /usr/lib/x86_64-linux-gnu/libcurl.so.4.5.0 '/usr/lib/x86_64-linux-gnu/libcurl.so.4' 
 		fi
 		
-		_msg "Removendo: libssl1.0.2"; sudo aptitude remove libssl1.0.2
-		#sudo aptitude remove libssl1.0.0
+		_msg "Removendo: libssl1.0.2"
+		sudo aptitude remove libssl1.0.2
+		# sudo aptitude remove libssl1.0.0
 		_msg "Executando: sudo ldconfig"; sudo ldconfig # Reconfigurar as libs.
 		
 		rm -rf ~/.local/bin/epsxe-amd64 1> /dev/null 2>&1	
