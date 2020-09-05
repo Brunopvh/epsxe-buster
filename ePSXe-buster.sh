@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Autor: Bruno Chaves
-__version__='2020-07-25'
+__version__='2020-09-05'
 # Ultima modificação: 2019-010-03
 #
 # Este programa istala o emulador ePSxe versão 64 bits no debian 10.
@@ -17,6 +17,8 @@ __version__='2020-07-25'
 #
 # 
 
+clear
+
 CRed="\e[0;31m"
 CSRed='\e[1;31m'
 CGreen="\e[0;32m"
@@ -24,11 +26,28 @@ CYellow="\e[0;33m"
 CSYellow="\e[1;33m"
 CReset="\e[m"
 
+
+if [[ -x $(command -v tput 2> /dev/null) ]]; then
+	columns=$(tput cols)
+else
+	columns='40'
+fi
+
+space_line()
+{
+	num='0'
+	while [[ "$num" != "$columns" ]]; do
+		printf '%s' "="
+		num="$(($num+1))"
+	done
+}
+
+
 _msg()
 {
-	echo '-----------------------------------------------'
+	space_line
 	echo -e " $@"
-	echo '-----------------------------------------------'
+	space_line
 }
 
 _yellow()
@@ -61,9 +80,21 @@ if [[ -z "$DISPLAY" ]]; then
 	exit 1 
 fi
 
-
 # Path do programa no disco.
-export readonly dir_root=$(dirname $(readlink -f "$0"))
+export readonly path_of_executable=$(readlink -f "$0")
+export readonly dir_root=$(dirname "$path_of_executable")
+
+
+space_line
+echo -e "${CRed} CUIDADO/CAUTION${CReset}"
+echo -e "  A se prosseguir com a instalação você não poderá usar a 'libcurl'."
+echo -e "  Caso tenha problemas execute ${CYellow}$path_of_executable --remove${CReset} para restaurar o estado original."
+echo ' '
+echo -e "  If you proceed with the installation you will not be able to use 'libcurl'."
+echo -e "  If you have problems run ... ${CYellow}$path_of_executable --remove${CReset} to restore the original state."
+space_line
+
+read -p "Pressione enter: "
 
 # Nome do sistema
 export os_name=$(grep '^ID=' /etc/os-release | sed 's|.*=||g')
