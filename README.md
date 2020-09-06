@@ -1,5 +1,5 @@
 # epsxe-buster
-Instala o emulador de playstation 1 ePSXe do Debian Buster.
+Instala o emulador de playstation 1 ePSXe nos sistemas Debian 10, Ubuntu 18.04 e derivados.
 
 Use: git clone https://github.com/Brunopvh/epsxe-buster.git
 
