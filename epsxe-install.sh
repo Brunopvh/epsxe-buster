@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Autor: Bruno Chaves
-__version__='2020-09-05'
+__version__='2020-09-06'
 # Ultima modificação: 2019-010-03
 #
 # Este programa istala o emulador ePSxe versão 64 bits no debian 10.
@@ -40,6 +40,7 @@ space_line()
 		printf '%s' "="
 		num="$(($num+1))"
 	done
+    printf '%s\n'
 }
 
 
@@ -327,7 +328,7 @@ __rmdir__()
 	# Se o arquivo/diretório não for removido por falta de privilegio 'root'
 	# A função __sudo__ irá remover o arquivo/diretório.
 	while [[ $1 ]]; do
-		printf "[>] Removendo: $1 "
+		printf "[>] Removendo: $(pwd)/$1 "
 		if rm -rf "$1" 2> /dev/null || sudo rm -rf "$1"; then
 			_syellow "OK"
 		else
