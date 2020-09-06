@@ -1,8 +1,10 @@
 # epsxe-buster
-Instala o emulador de playstation 1 ePSXe do Debian Buster - (Modo gráfico com zenity)
+Instala o emulador de playstation 1 ePSXe do Debian Buster.
 
 Use: git clone https://github.com/Brunopvh/epsxe-buster.git
 
-cd epsxe-buster/ && chmod +x ePSXe-buster.sh && ./ePSXe-buster.sh
+cd epsxe-buster/ && chmod +x epsxe-install.sh && ./epsxe-install.sh
 
-Opicional: ./ePSXe-buster.sh --help
+Opicional: ./epsxe-install.sh --help
+
+
