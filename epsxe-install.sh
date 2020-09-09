@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 #
 # Autor: Bruno Chaves
-__version__='2020-09-06'
-# Ultima modificação: 2019-010-03
+__version__='2020-09-08'
 #
-# Este programa istala o emulador ePSxe versão 64 bits no debian 10.
+# Este programa instala o emulador ePSxe versão 64 bits no debian 10.
 #
 # https://www.epsxe.com/
 #
@@ -13,7 +12,7 @@ __version__='2020-09-06'
 # cd epsxe-buster/ && chmod +x ePSXe-buster.sh && ./ePSXe-buster.sh
 #
 # Exucuçã via wget:
-# wget -qc https://raw.githubusercontent.com/Brunopvh/epsxe-buster/master/ePSXe-buster.sh -O - | bash 
+# wget -qc https://raw.githubusercontent.com/Brunopvh/epsxe-buster/master/epsxe-install.sh -O - | bash 
 #
 # 
 
